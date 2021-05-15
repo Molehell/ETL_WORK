@@ -17,7 +17,7 @@ dict {
 '''
 
 import codecs
-import os
+import re
 
 ## 初始化常量
 OLD_TABLE_NUM = 1
@@ -89,8 +89,58 @@ for key in tmp_dict.keys():
     mapping_dict[key] = table_list
 
 ## 清空临时字段和列表
-column_dict = table_list = column_list =''
+column_dict = table_list = column_list = tmp_list = ''
 
 
-print(mapping_dict['BI_2'][1]['age'][1])
+##print(mapping_dict['BI_2'][1]['age'][1])
         
+
+## 获取sql
+
+with open('init.sql','r') as f:
+    tmp_str = f.read()
+
+
+
+sql_dict = {}
+
+#### 表名获取
+### 主表
+master_table = re.findall(r"FROM((.*)*)",tmp_str)[0][0]
+## 去空
+tmp_list = []
+for strs in master_table.split(' '):
+    if strs != '':
+        tmp_list.append(strs)
+## 录入主表
+## {'A':'table_name'}
+sql_dict[tmp_list[1]]=tmp_list[0]
+
+### 从表
+slave_table = re.findall(r"JOIN((.*)*)ON",tmp_str)
+for slaves in slave_table:
+    tmp_list = []
+    if slaves != '':
+        for strs in slaves[0].split(' '):
+            if strs != '':
+                tmp_list.append(strs)
+    ## 录从主表
+    ## {'B':'table_name'}
+    sql_dict[tmp_list[1]]=tmp_list[0]
+
+
+#### 替换表名
+for table_as in sql_dict.keys() :
+    ### 判断是否存在对应表名映射
+    if sql_dict[table_as] in mapping_dict.keys():
+        tmp_str = re.sub(r" %s "%sql_dict[table_as]," %s "%mapping_dict[sql_dict[table_as]][0],tmp_str)
+    
+        ### 替换字段
+        column_list = re.findall(r"%s\.(\w*)"%table_as,tmp_str)
+        
+        for column in list(set(column_list)):
+            tmp_str = re.sub(r"%s\.%s "%(table_as,column),"%s.%s "%(table_as,mapping_dict[sql_dict[table_as]][1][column][0]),tmp_str)
+
+    else:
+        print("\n!! NO TABLE_NAME: %s IN MAPPING !!\n"%sql_dict[table_as])
+print(tmp_str)
